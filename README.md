@@ -1,4 +1,15 @@
-This is a fork of [Tim Hutton's original project](https://github.com/timhutton/twitter-archive-parser/). I have modified the script so:
+This is a fork of [SuperWillyFoc version](https://github.com/superwillyfoc/twitter-archive-parser), which is a fork of [Tim Hutton's original project](https://github.com/timhutton/twitter-archive-parser/).
+
+I changed:
+
+- Added header to every file with metadata.
+- Converted date so it is displayed in spanish.
+- Added time offset depending on the time (summer time / winter time).
+- Added a script that removes media objects that are not part of the tweets (media objects for DMs or something else than tweets).
+
+---
+
+SuperWillyFoc modified the script so:
 - It generates one file per day (and not per month).
 - The content is cleaner and using "- - -" as horizontal line.
 - The name of the generated files is just "YYYY-MM-dd.md".

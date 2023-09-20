@@ -21,6 +21,7 @@ from collections import defaultdict
 from typing import Optional
 from urllib.parse import urlparse
 import datetime
+from datetime import timedelta
 import glob
 import importlib
 import json
@@ -258,6 +259,27 @@ def escape_markdown(input_text: str) -> str:
             output_text = output_text + char
     return output_text
 
+def get_date_with_rigth_timezone(original_date):
+    """Converts given date to Europe/Madrid timezone"""
+    summer_starts = datetime.datetime(original_date.year, 3, 31)
+    summer_ends = datetime.datetime(original_date.year, 10, 31)
+    
+    timestamp_no_timezone = original_date.replace(tzinfo=None)
+    
+    # Check if given date is in summer time
+    its_summer_time = summer_starts <= timestamp_no_timezone <= summer_ends
+
+    # Calculates the offset depending on the timezone (GTM+2 in summer time, GMT+1 in winter)
+    if its_summer_time:
+        add_hours = timedelta(hours=2)
+    else:
+        add_hours = timedelta(hours=1)
+
+    # Adds the offset to the UTC date
+    timestamp_gmt = original_date + add_hours
+    
+    return timestamp_gmt
+
 def convert_tweet(tweet, username, media_sources, users: dict, paths: PathConfig):
     """Converts a JSON-format tweet. Returns tuple of timestamp, markdown and HTML."""
     if 'tweet' in tweet.keys():
@@ -267,6 +289,8 @@ def convert_tweet(tweet, username, media_sources, users: dict, paths: PathConfig
     timestamp_full = datetime.datetime.strptime(timestamp_str, '%a %b %d %H:%M:%S %z %Y')
     timestamp = int(round(timestamp_full.timestamp()))
     
+    timestamp_gmt = get_date_with_rigth_timezone(timestamp_full)
+
     # Get original locale that works with received timestamp
     locale_original = locale.getlocale(locale.LC_TIME)
 
@@ -274,7 +298,7 @@ def convert_tweet(tweet, username, media_sources, users: dict, paths: PathConfig
     locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
     
     # Get the timestamp as string in spanish format
-    timestamp_str_es = timestamp_full.strftime('%H:%M:%S - %A %d de %B de %Y')
+    timestamp_str_es = timestamp_gmt.strftime('%H:%M:%S - %A %d de %B de %Y')
     
     # Restore original locale so the timestamp_full can be mapped without errors.
     locale.setlocale(locale.LC_TIME, locale_original)
