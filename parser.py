@@ -24,6 +24,7 @@ import datetime
 import glob
 import importlib
 import json
+import locale
 import logging
 import os
 import re
@@ -39,7 +40,6 @@ import time
 # Print a compile-time error in Python < 3.6. This line does nothing in Python 3.6+ but is reported to the user
 # as an error (because it is the first line that fails to compile) in older versions.
 f' Error: This script requires Python 3.6 or later. Use `python --version` to check your version.'
-
 
 class UserData:
     def __init__(self, user_id: str, handle: str):
@@ -258,14 +258,27 @@ def escape_markdown(input_text: str) -> str:
             output_text = output_text + char
     return output_text
 
-
 def convert_tweet(tweet, username, media_sources, users: dict, paths: PathConfig):
     """Converts a JSON-format tweet. Returns tuple of timestamp, markdown and HTML."""
     if 'tweet' in tweet.keys():
         tweet = tweet['tweet']
     timestamp_str = tweet['created_at']
-    timestamp = int(round(datetime.datetime.strptime(timestamp_str, '%a %b %d %X %z %Y').timestamp()))
     # Example: Tue Mar 19 14:05:17 +0000 2019
+    timestamp_full = datetime.datetime.strptime(timestamp_str, '%a %b %d %H:%M:%S %z %Y')
+    timestamp = int(round(timestamp_full.timestamp()))
+    
+    # Get original locale that works with received timestamp
+    locale_original = locale.getlocale(locale.LC_TIME)
+
+    # Change locale to spanish to get the right name of the day and month
+    locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
+    
+    # Get the timestamp as string in spanish format
+    timestamp_str_es = timestamp_full.strftime('%H:%M:%S - %A %d de %B de %Y')
+    
+    # Restore original locale so the timestamp_full can be mapped without errors.
+    locale.setlocale(locale.LC_TIME, locale_original)
+
     body_markdown = tweet['full_text']
     body_html = tweet['full_text']
     tweet_id_str = tweet['id_str']
@@ -395,7 +408,7 @@ def convert_tweet(tweet, username, media_sources, users: dict, paths: PathConfig
     # append the original Twitter URL as a link
     original_tweet_url = f'https://twitter.com/{username}/status/{tweet_id_str}'
     icon_url = rel_url(paths.file_tweet_icon, paths.example_file_output_tweets) 
-    body_markdown = header_markdown + body_markdown + f'[{timestamp_str}]({original_tweet_url})'
+    body_markdown = header_markdown + body_markdown + f'[{timestamp_str_es}]({original_tweet_url})'
     body_html = header_html + body_html + f'<a href="{original_tweet_url}">{timestamp_str}</a></p>'
     # extract user_id:handle connections
     if 'in_reply_to_user_id' in tweet and 'in_reply_to_screen_name' in tweet and \
@@ -609,9 +622,19 @@ def parse_tweets(username, users, html_template, paths: PathConfig):
 
     for (year, month, day), content in grouped_tweets.items():
         # Write into *.md files
+        md_header = """---
+Date: {0:02}/{1:02}/{2:04}
+Time:
+Tags:
+    - Twitter/Archive
+---
+# {2:04}-{1:02}-{0:02}
+
+""".format(day, month, year)
         md_string = '\n- - -\n\n'.join(md for md, _ in content)
         md_path = paths.create_path_for_file_output_tweets(year, month, day, format="md")
         with open_and_mkdirs(md_path) as f:
+            f.write(md_header)
             f.write(md_string)
 
         # Write into *.html files
